@@ -13,8 +13,6 @@
 
 #include "swigmod.h"
 #include "cparse.h"
-static int treduce = SWIG_cparse_template_reduce(0);
-
 #include <ctype.h>
 
 static const char *usage = "\
@@ -327,8 +325,8 @@ public:
 
     Swig_banner(f_begin);
 
-    Printf(f_runtime, "\n");
-    Printf(f_runtime, "#define SWIGPERL\n");
+    Printf(f_runtime, "\n\n#ifndef SWIGPERL\n#define SWIGPERL\n#endif\n\n");
+
     if (directorsEnabled()) {
       Printf(f_runtime, "#define SWIG_DIRECTORS\n");
     }
@@ -470,6 +468,7 @@ public:
 
     if (directorsEnabled()) {
       // Insert director runtime into the f_runtime file (make it occur before %header section)
+      Swig_insert_file("director_common.swg", f_runtime);
       Swig_insert_file("director.swg", f_runtime);
     }
 
@@ -1046,21 +1045,9 @@ public:
 
     String *tt = Getattr(n, "tmap:varout:type");
     if (tt) {
-      String *tm = NewStringf("&SWIGTYPE%s", SwigType_manglestr(t));
-      if (Replaceall(tt, "$1_descriptor", tm)) {
-	SwigType_remember(t);
-      }
-      Delete(tm);
-      SwigType *st = Copy(t);
-      SwigType_add_pointer(st);
-      tm = NewStringf("&SWIGTYPE%s", SwigType_manglestr(st));
-      if (Replaceall(tt, "$&1_descriptor", tm)) {
-	SwigType_remember(st);
-      }
-      Delete(tm);
-      Delete(st);
+      tt = NewStringf("&%s", tt);
     } else {
-      tt = (String *) "0";
+      tt = NewString("0");
     }
     /* Now add symbol to the PERL interpreter */
     if (GetFlag(n, "feature:immutable")) {
@@ -1088,6 +1075,7 @@ public:
     if (export_all)
       Printf(exported, "$%s ", iname);
 
+    Delete(tt);
     DelWrapper(setf);
     DelWrapper(getf);
     Delete(getname);
@@ -2102,6 +2090,10 @@ public:
     Delete(target);
 
     // Get any exception classes in the throws typemap
+    if (Getattr(n, "noexcept")) {
+      Append(w->def, " noexcept");
+      Append(declaration, " noexcept");
+    }
     ParmList *throw_parm_list = 0;
 
     if ((throw_parm_list = Getattr(n, "throws")) || Getattr(n, "throw")) {
@@ -2138,10 +2130,22 @@ public:
      * handle it, including declaration of c_result ($result).
      */
     if (!is_void) {
-      if (!(ignored_method && !pure_virtual)) {
-	String *cres = SwigType_lstr(returntype, "c_result");
-	Printf(w->code, "%s;\n", cres);
-	Delete(cres);
+      if (!ignored_method || pure_virtual) {
+	if (!SwigType_isclass(returntype)) {
+	  if (!(SwigType_ispointer(returntype) || SwigType_isreference(returntype))) {
+	    String *construct_result = NewStringf("= SwigValueInit< %s >()", SwigType_lstr(returntype, 0));
+	    Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), construct_result, NIL);
+	    Delete(construct_result);
+	  } else {
+	    Wrapper_add_localv(w, "c_result", SwigType_lstr(returntype, "c_result"), "= 0", NIL);
+	  }
+	} else {
+	  String *cres = SwigType_lstr(returntype, "c_result");
+	  Printf(w->code, "%s;\n", cres);
+	  Delete(cres);
+	}
+      }
+      if (!ignored_method) {
 	String *pres = NewStringf("SV *%s", Swig_cresult_name());
 	Wrapper_add_local(w, Swig_cresult_name(), pres);
 	Delete(pres);
@@ -2254,7 +2258,7 @@ public:
 	    if (SwigType_isreference(ptype)) {
 	      Insert(ppname, 0, "&");
 	    }
-	    /* if necessary, cast away const since Python doesn't support it! */
+	    /* if necessary, cast away const since Perl doesn't support it! */
 	    if (SwigType_isconst(nptype)) {
 	      nonconst = NewStringf("nc_tmp_%s", pname);
 	      String *nonconst_i = NewStringf("= const_cast< %s >(%s)", SwigType_lstr(ptype, 0), ppname);
@@ -2496,7 +2500,10 @@ public:
     Delete(mangle);
     Delete(ptype);
 
-    if (Getattr(n, "throw")) {
+    if (Getattr(n, "noexcept")) {
+      Printf(f_directors_h, "    virtual ~%s() noexcept;\n", DirectorClassName);
+      Printf(f_directors, "%s::~%s() noexcept {%s}\n\n", DirectorClassName, DirectorClassName, body);
+    } else if (Getattr(n, "throw")) {
       Printf(f_directors_h, "    virtual ~%s() throw ();\n", DirectorClassName);
       Printf(f_directors, "%s::~%s() throw () {%s}\n\n", DirectorClassName, DirectorClassName, body);
     } else {

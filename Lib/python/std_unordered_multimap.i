@@ -17,6 +17,13 @@
     }
 
     template <class K, class T>
+    struct traits_reserve<std::unordered_multimap<K,T> >  {
+      static void reserve(std::unordered_multimap<K,T> &seq, typename std::unordered_multimap<K,T>::size_type n) {
+        seq.reserve(n);
+      }
+    };
+
+    template <class K, class T>
     struct traits_asptr<std::unordered_multimap<K,T> >  {
       typedef std::unordered_multimap<K,T> unordered_multimap_type;
       static int asptr(PyObject *obj, std::unordered_multimap<K,T> **val) {
@@ -26,7 +33,8 @@
 	  return traits_asptr_stdseq<std::unordered_multimap<K,T>, std::pair<K, T> >::asptr(items, val);
 	} else {
 	  unordered_multimap_type *p;
-	  res = SWIG_ConvertPtr(obj,(void**)&p,swig::type_info<unordered_multimap_type>(),0);
+	  swig_type_info *descriptor = swig::type_info<unordered_multimap_type>();
+	  res = descriptor ? SWIG_ConvertPtr(obj, (void **)&p, descriptor, 0) : SWIG_ERROR;
 	  if (SWIG_IsOK(res) && val)  *val = p;
 	}
 	return res;
@@ -42,14 +50,13 @@
       static PyObject *from(const unordered_multimap_type& unordered_multimap) {
 	swig_type_info *desc = swig::type_info<unordered_multimap_type>();
 	if (desc && desc->clientdata) {
-	  return SWIG_NewPointerObj(new unordered_multimap_type(unordered_multimap), desc, SWIG_POINTER_OWN);
+	  return SWIG_InternalNewPointerObj(new unordered_multimap_type(unordered_multimap), desc, SWIG_POINTER_OWN);
 	} else {
 	  size_type size = unordered_multimap.size();
-	  int pysize = (size <= (size_type) INT_MAX) ? (int) size : -1;
+	  Py_ssize_t pysize = (size <= (size_type) INT_MAX) ? (Py_ssize_t) size : -1;
 	  if (pysize < 0) {
 	    SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-	    PyErr_SetString(PyExc_OverflowError,
-			    "unordered_multimap size not valid in python");
+	    PyErr_SetString(PyExc_OverflowError, "unordered_multimap size not valid in python");
 	    SWIG_PYTHON_THREAD_END_BLOCK;
 	    return NULL;
 	  }
@@ -67,8 +74,18 @@
 }
 
 %define %swig_unordered_multimap_methods(Type...) 
-  %swig_map_common(Type);
+  %swig_unordered_map_common(Type);
+
+#if defined(SWIGPYTHON_BUILTIN)
+  %feature("python:slot", "mp_ass_subscript", functype="objobjargproc") __setitem__;
+#endif
+
   %extend {
+    // This will be called through the mp_ass_subscript slot to delete an entry.
+    void __setitem__(const key_type& key) {
+      self->erase(key);
+    }
+
     void __setitem__(const key_type& key, const mapped_type& x) throw (std::out_of_range) {
       self->insert(Type::value_type(key,x));
     }

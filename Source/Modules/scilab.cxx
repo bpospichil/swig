@@ -18,13 +18,14 @@ static const int SCILAB_VARIABLE_NAME_CHAR_MAX = SCILAB_IDENTIFIER_NAME_CHAR_MAX
 
 static const char *usage = (char *) " \
 Scilab options (available with -scilab)\n \
-     -builder                        - Generate a Scilab builder script\n \
-     -buildercflags <cflags>         - Add <cflags> to the builder compiler flags\n \
-     -builderflagscript <file>       - Set the Scilab script <file> to use by builder to configure the build flags\n \
-     -builderldflags <ldflags>       - Add <ldflags> to the builder linker flags\n \
-     -buildersources <files>         - Add the (comma separated) files <files> to the builder sources\n \
-     -builderverbositylevel <level>  - Set the builder verbosity level to <level> (default 0: off, 2: high)\n \
-     -gatewayxml <gateway_id>        - Generate gateway xml with the given <gateway_id>\n \
+     -builder                               - Generate a Scilab builder script\n \
+     -buildercflags <cflags>                - Add <cflags> to the builder compiler flags\n \
+     -builderflagscript <file>              - Set the Scilab script <file> to use by builder to configure the build flags\n \
+     -builderldflags <ldflags>              - Add <ldflags> to the builder linker flags\n \
+     -buildersources <files>                - Add the (comma separated) files <files> to the builder sources\n \
+     -builderverbositylevel <level>         - Set the builder verbosity level to <level> (default 0: off, 2: high)\n \
+     -gatewayxml <gateway_id>               - Generate gateway xml with the given <gateway_id>\n \
+     -targetversion <scilab_major_version>  - Generate for Scilab target (major) version (default: 5)\n \
 \n";
 
 
@@ -38,6 +39,8 @@ protected:
   File *initSection;
 
   String *variablesCode;
+
+  int targetVersion;
 
   bool generateBuilder;
   File *builderFile;
@@ -71,6 +74,7 @@ public:
    * ----------------------------------------------------------------------*/
 
   virtual void main(int argc, char *argv[]) {
+    targetVersion = 5;
 
     generateBuilder = false;
     sourceFileList = NewList();
@@ -95,48 +99,54 @@ public:
     /* Manage command line arguments */
     for (int argIndex = 1; argIndex < argc; argIndex++) {
       if (argv[argIndex] != NULL) {
-	if (strcmp(argv[argIndex], "-help") == 0) {
-	  Printf(stdout, "%s\n", usage);
-	} else if (strcmp(argv[argIndex], "-builder") == 0) {
-	  Swig_mark_arg(argIndex);
-	  generateBuilder = true;
-	  createLoader = false;
-	} else if (strcmp(argv[argIndex], "-buildersources") == 0) {
-	  if (argv[argIndex + 1] != NULL) {
-	    Swig_mark_arg(argIndex);
-	    char *sourceFile = strtok(argv[argIndex + 1], ",");
-	    while (sourceFile != NULL) {
-	      Insert(sourceFileList, Len(sourceFileList), sourceFile);
-	      sourceFile = strtok(NULL, ",");
-	    }
-	    Swig_mark_arg(argIndex + 1);
-	  }
-	} else if (strcmp(argv[argIndex], "-buildercflags") == 0) {
-	  Swig_mark_arg(argIndex);
-	  if (argv[argIndex + 1] != NULL) {
-	    Insert(cflags, Len(cflags), argv[argIndex + 1]);
-	    Swig_mark_arg(argIndex + 1);
-	  }
-	} else if (strcmp(argv[argIndex], "-builderldflags") == 0) {
-	  Swig_mark_arg(argIndex);
-	  if (argv[argIndex + 1] != NULL) {
-	    Insert(ldflags, Len(ldflags), argv[argIndex + 1]);
-	    Swig_mark_arg(argIndex + 1);
-	  }
-	} else if (strcmp(argv[argIndex], "-builderverbositylevel") == 0) {
-	  Swig_mark_arg(argIndex);
-	  verboseBuildLevel = NewString(argv[argIndex + 1]);
-	  Swig_mark_arg(argIndex + 1);
-	} else if (strcmp(argv[argIndex], "-builderflagscript") == 0) {
-	  Swig_mark_arg(argIndex);
-	  buildFlagsScript = NewString(argv[argIndex + 1]);
-	  Swig_mark_arg(argIndex + 1);
-	} else if (strcmp(argv[argIndex], "-gatewayxml") == 0) {
-	  Swig_mark_arg(argIndex);
-	  createGatewayXML = true;
-	  gatewayID = NewString(argv[argIndex + 1]);
-	  Swig_mark_arg(argIndex + 1);
-	}
+	      if (strcmp(argv[argIndex], "-help") == 0) {
+	        Printf(stdout, "%s\n", usage);
+	      } else if (strcmp(argv[argIndex], "-builder") == 0) {
+	        Swig_mark_arg(argIndex);
+	        generateBuilder = true;
+	        createLoader = false;
+	      } else if (strcmp(argv[argIndex], "-buildersources") == 0) {
+	        if (argv[argIndex + 1] != NULL) {
+	          Swig_mark_arg(argIndex);
+	          char *sourceFile = strtok(argv[argIndex + 1], ",");
+	          while (sourceFile != NULL) {
+	            Insert(sourceFileList, Len(sourceFileList), sourceFile);
+	            sourceFile = strtok(NULL, ",");
+	          }
+	          Swig_mark_arg(argIndex + 1);
+	        }
+	      } else if (strcmp(argv[argIndex], "-buildercflags") == 0) {
+          Swig_mark_arg(argIndex);
+          if (argv[argIndex + 1] != NULL) {
+            Insert(cflags, Len(cflags), argv[argIndex + 1]);
+            Swig_mark_arg(argIndex + 1);
+          }
+        } else if (strcmp(argv[argIndex], "-builderldflags") == 0) {
+          Swig_mark_arg(argIndex);
+          if (argv[argIndex + 1] != NULL) {
+            Insert(ldflags, Len(ldflags), argv[argIndex + 1]);
+            Swig_mark_arg(argIndex + 1);
+          }
+        } else if (strcmp(argv[argIndex], "-builderverbositylevel") == 0) {
+          Swig_mark_arg(argIndex);
+          verboseBuildLevel = NewString(argv[argIndex + 1]);
+          Swig_mark_arg(argIndex + 1);
+        } else if (strcmp(argv[argIndex], "-builderflagscript") == 0) {
+          Swig_mark_arg(argIndex);
+          buildFlagsScript = NewString(argv[argIndex + 1]);
+          Swig_mark_arg(argIndex + 1);
+        } else if (strcmp(argv[argIndex], "-gatewayxml") == 0) {
+          Swig_mark_arg(argIndex);
+          createGatewayXML = true;
+          gatewayID = NewString(argv[argIndex + 1]);
+          Swig_mark_arg(argIndex + 1);
+        } else if (strcmp(argv[argIndex], "-targetversion") == 0) {
+          if (argv[argIndex + 1] != NULL) {
+            Swig_mark_arg(argIndex);
+            targetVersion = atoi(argv[argIndex + 1]);
+            Swig_mark_arg(argIndex + 1);
+          }
+        }
       }
     }
 
@@ -195,8 +205,7 @@ public:
     /* Output module initialization code */
     Swig_banner(beginSection);
 
-    Printf(runtimeSection, "\n#define SWIGSCILAB\n");
-    Printf(runtimeSection, "\n");
+    Printf(runtimeSection, "\n\n#ifndef SWIGSCILAB\n#define SWIGSCILAB\n#endif\n\n");
 
     // Gateway header source merged with wrapper source in nobuilder mode
     if (!generateBuilder)
@@ -327,6 +336,7 @@ public:
     bool isLastOverloaded = isOverloaded && !Getattr(node, "sym:nextSibling");
 
     if (!isOverloaded && !addSymbol(functionName, node)) {
+      DelWrapper(wrapper);
       return SWIG_ERROR;
     }
 
@@ -346,14 +356,18 @@ public:
     emit_attach_parmmaps(functionParamsList, wrapper);
     Setattr(node, "wrap:parms", functionParamsList);
 
-    /* Check arguments */
+    /* Check input/output arguments count */
     int maxInputArguments = emit_num_arguments(functionParamsList);
     int minInputArguments = emit_num_required(functionParamsList);
     int minOutputArguments = 0;
     int maxOutputArguments = 0;
 
-    /* Insert calls to CheckInputArgument and CheckOutputArgument */
-    Printf(wrapper->code, "SWIG_CheckInputArgument(pvApiCtx, $mininputarguments, $maxinputarguments);\n");
+    if (!emit_isvarargs(functionParamsList)) {
+      Printf(wrapper->code, "SWIG_CheckInputArgument(pvApiCtx, $mininputarguments, $maxinputarguments);\n");
+    }
+    else {
+      Printf(wrapper->code, "SWIG_CheckInputArgumentAtLeast(pvApiCtx, $mininputarguments-1);\n");
+    }
     Printf(wrapper->code, "SWIG_CheckOutputArgument(pvApiCtx, $minoutputarguments, $maxoutputarguments);\n");
 
     /* Set context */
@@ -408,7 +422,7 @@ public:
     emit_return_variable(node, functionReturnType, wrapper);
 
     /* Return the function value if necessary */
-    String *functionReturnTypemap = Swig_typemap_lookup_out("out", node, "result", wrapper, functionActionCode);
+    String *functionReturnTypemap = Swig_typemap_lookup_out("out", node, Swig_cresult_name(), wrapper, functionActionCode);
     if (functionReturnTypemap) {
       // Result is actually the position of output value on stack
       if (Len(functionReturnTypemap) > 0) {
@@ -467,6 +481,13 @@ public:
       }
     }
 
+    /* See if there is any return cleanup code */
+    String *tm;
+    if ((tm = Swig_typemap_lookup("ret", node, Swig_cresult_name(), 0))) {
+      Replaceall(tm, "$source", Swig_cresult_name());
+      Printf(wrapper->code, "%s\n", tm);
+      Delete(tm);
+    }
 
     /* Close the function(ok) */
     Printv(wrapper->code, "return SWIG_OK;\n", NIL);
@@ -630,7 +651,10 @@ public:
 
       /* Add function to builder table */
       addFunctionToScilab(scilabSetFunctionName, setFunctionName);
+
+      DelWrapper(setFunctionWrapper);
     }
+    DelWrapper(getFunctionWrapper);
 
     return SWIG_OK;
   }
@@ -657,7 +681,7 @@ public:
       if (isConstant || isEnum) {
 	if (isEnum) {
 	  Setattr(node, "type", "double");
-	  constantValue = Getattr(node, "enumvalue");
+	  constantValue = Getattr(node, "value");
 	}
 
 	constantTypemap = Swig_typemap_lookup("scilabconstcode", node, nodeName, 0);
@@ -675,7 +699,7 @@ public:
       }
     }
 
-    /* Create variables for member pointer constants, not suppported by typemaps (like Python wrapper does) */
+    /* Create variables for member pointer constants, not supported by typemaps (like Python wrapper does) */
     if (SwigType_type(type) == T_MPOINTER) {
       String *wname = Swig_name_wrapper(constantName);
       String *str = SwigType_str(type, wname);
@@ -770,56 +794,60 @@ public:
 
   /* -----------------------------------------------------------------------
    * checkIdentifierName()
-   * Truncates (and displays a warning) for too long identifier names
-   * (applies on functions, variables, constants...)
-   * (Scilab identifiers names are limited to 24 chars max)
+   * If Scilab target version is lower than 6:
+   *   truncates (and displays a warning) too long member identifier names
+   *   (applies on members of structs, classes...)
+   *   (Scilab 5 identifier names are limited to 24 chars max)
    * ----------------------------------------------------------------------- */
 
   String *checkIdentifierName(String *name, int char_size_max) {
     String *scilabIdentifierName;
-    if (Len(name) > char_size_max) {
-      scilabIdentifierName = DohNewStringWithSize(name, char_size_max);
-      Swig_warning(WARN_SCILAB_TRUNCATED_NAME, input_file, line_number,
-		   "Identifier name '%s' exceeds 24 characters and has been truncated to '%s'.\n", name, scilabIdentifierName);
-    } else
+    if (targetVersion <= 5) {
+			if (Len(name) > char_size_max) {
+				scilabIdentifierName = DohNewStringWithSize(name, char_size_max);
+				Swig_warning(WARN_SCILAB_TRUNCATED_NAME, input_file, line_number,
+					"Identifier name '%s' exceeds 24 characters and has been truncated to '%s'.\n", name, scilabIdentifierName);
+			} else
       scilabIdentifierName = name;
-    return scilabIdentifierName;
+		} else {
+			scilabIdentifierName = DohNewString(name);
+		}
+		return scilabIdentifierName;
   }
 
   /* -----------------------------------------------------------------------
    * checkMemberIdentifierName()
-   * Truncates (and displays a warning) too long member identifier names
-   * (applies on members of structs, classes...)
-   * (Scilab identifiers names are limited to 24 chars max)
+   * If Scilab target version is lower than 6:
+   *   truncates (and displays a warning) too long member identifier names
+   *   (applies on members of structs, classes...)
+   *   (Scilab 5 identifier names are limited to 24 chars max)
    * ----------------------------------------------------------------------- */
 
   void checkMemberIdentifierName(Node *node, int char_size_max) {
+    if (targetVersion <= 5) {
+      String *memberName = Getattr(node, "sym:name");
+      Node *containerNode = parentNode(node);
+      String *containerName = Getattr(containerNode, "sym:name");
+      int lenContainerName = Len(containerName);
+      int lenMemberName = Len(memberName);
 
-    String *memberName = Getattr(node, "sym:name");
+      if (lenContainerName + lenMemberName + 1 > char_size_max) {
+        int lenScilabMemberName = char_size_max - lenContainerName - 1;
 
-    Node *containerNode = parentNode(node);
-    String *containerName = Getattr(containerNode, "sym:name");
-
-    int lenContainerName = Len(containerName);
-    int lenMemberName = Len(memberName);
-
-    if (lenContainerName + lenMemberName + 1 > char_size_max) {
-      int lenScilabMemberName = char_size_max - lenContainerName - 1;
-
-      if (lenScilabMemberName > 0) {
-	String *scilabMemberName = DohNewStringWithSize(memberName, lenScilabMemberName);
-	Setattr(node, "sym:name", scilabMemberName);
-	Swig_warning(WARN_SCILAB_TRUNCATED_NAME, input_file, line_number,
-		     "Wrapping functions names for member '%s.%s' will exceed 24 characters, "
-		     "so member name has been truncated to '%s'.\n", containerName, memberName, scilabMemberName);
-      } else
-	Swig_error(input_file, line_number,
-		   "Wrapping functions names for member '%s.%s' will exceed 24 characters, "
-		   "please rename the container of member '%s'.\n", containerName, memberName, containerName);
+        if (lenScilabMemberName > 0) {
+	        String *scilabMemberName = DohNewStringWithSize(memberName, lenScilabMemberName);
+	        Setattr(node, "sym:name", scilabMemberName);
+	        Swig_warning(WARN_SCILAB_TRUNCATED_NAME, input_file, line_number,
+		        "Wrapping functions names for member '%s.%s' will exceed 24 characters, "
+		        "so member name has been truncated to '%s'.\n", containerName, memberName, scilabMemberName);
+        } else {
+	        Swig_error(input_file, line_number,
+		        "Wrapping functions names for member '%s.%s' will exceed 24 characters, "
+		        "please rename the container of member '%s'.\n", containerName, memberName, containerName);
+        }
+      }
     }
   }
-
-
 
   /* -----------------------------------------------------------------------
    * addHelperFunctions()
@@ -881,7 +909,7 @@ public:
     Printf(builderCode, "libs = [];\n");
 
     // Flags from command line arguments
-    Printf(builderCode, "cflags = [];\n");
+    Printf(builderCode, "cflags = \"\";\n");
     for (int i = 0; i < Len(cflags); i++) {
       String *cflag = Getitem(cflags, i);
       Printf(builderCode, "cflags = cflags + \" %s\";\n", cflag);
@@ -897,7 +925,7 @@ public:
 	}
       }
     } else {
-      Printf(builderCode, "ldflags = [];\n");
+      Printf(builderCode, "ldflags = \"\";\n");
     }
 
     // External script to set flags
@@ -999,8 +1027,14 @@ public:
     Printf(gatewayHeader, "\n");
 
     gatewayHeaderV6 = NewString("");
+    Printf(gatewayHeaderV6, "#ifdef __cplusplus\n");
+    Printf(gatewayHeaderV6, "extern \"C\" {\n");
+    Printf(gatewayHeaderV6, "#endif\n");
     Printf(gatewayHeaderV6, "#include \"c_gateway_prototype.h\"\n");
     Printf(gatewayHeaderV6, "#include \"addfunction.h\"\n");
+    Printf(gatewayHeaderV6, "#ifdef __cplusplus\n");
+    Printf(gatewayHeaderV6, "}\n");
+    Printf(gatewayHeaderV6, "#endif\n");
     Printf(gatewayHeaderV6, "\n");
     Printf(gatewayHeaderV6, "#define MODULE_NAME L\"%s\"\n", gatewayLibraryName);
     Printf(gatewayHeaderV6, "#ifdef __cplusplus\n");
@@ -1023,7 +1057,7 @@ public:
       Printf(gatewayHeaderV5, ",\n");
     Printf(gatewayHeaderV5, " {(Myinterfun)sci_gateway, (GT)%s, (char *)\"%s\"}", wrapperFunctionName, scilabFunctionName);
 
-    Printf(gatewayHeaderV6, "if (wcscmp(pwstFuncName, L\"%s\") == 0) { addCFunction((wchar_t *)L\"%s\", &%s, (wchar_t *)MODULE_NAME); }\n", scilabFunctionName, scilabFunctionName, wrapperFunctionName);
+    Printf(gatewayHeaderV6, "if (wcscmp(pwstFuncName, L\"%s\") == 0) { addCStackFunction((wchar_t *)L\"%s\", &%s, (wchar_t *)MODULE_NAME); }\n", scilabFunctionName, scilabFunctionName, wrapperFunctionName);
   }
 
   /* -----------------------------------------------------------------------

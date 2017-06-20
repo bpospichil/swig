@@ -33,9 +33,7 @@
 # can be used for memory checking of the runtime tests using:
 #   make RUNTOOL="valgrind --leak-check=full"
 # and valgrind can be used when invoking SWIG using:
-#   make SWIGTOOL="valgrind --tool=memcheck --trace-children=yes"
-#    Note: trace-children needed because of preinst-swig shell wrapper
-#    to the swig executable.
+#   make SWIGTOOL="valgrind --tool=memcheck"
 #
 # An individual test run can be debugged easily:
 #   make director_string.cpptest RUNTOOL="gdb --args"
@@ -56,8 +54,8 @@ endif
 COMPILETOOL=
 SWIGTOOL   =
 
-SWIG       = $(SWIGTOOL) $(top_builddir)/preinst-swig
-SWIG_LIB   = $(top_srcdir)/Lib
+SWIGEXE   = $(top_builddir)/swig
+SWIG_LIB_DIR = $(top_srcdir)/Lib
 TEST_SUITE = test-suite
 EXAMPLES   = Examples
 CXXSRCS    = 
@@ -89,7 +87,6 @@ CPP_TEST_BROKEN += \
 	director_nested_class \
 	exception_partial_info \
 	extend_variable \
-	li_std_vector_ptr \
 	li_boost_shared_ptr_template \
 	nested_private \
 	overload_complicated \
@@ -138,6 +135,7 @@ CPP_TEST_CASES += \
 	casts \
 	char_binary \
 	char_strings \
+	chartest \
 	class_forward \
 	class_ignore \
 	class_scope_weird \
@@ -156,6 +154,7 @@ CPP_TEST_CASES += \
 	conversion \
 	conversion_namespace \
 	conversion_ns_template \
+	conversion_operators \
 	cplusplus_throw \
 	cpp_basic \
 	cpp_enum \
@@ -174,7 +173,6 @@ CPP_TEST_CASES += \
 	director_abstract \
 	director_alternating \
 	director_basic \
-	director_property \
 	director_binary_string \
 	director_classes \
 	director_classic \
@@ -189,19 +187,23 @@ CPP_TEST_CASES += \
 	director_ignore \
 	director_keywords \
 	director_namespace_clash \
+	director_nested \
 	director_nspace \
 	director_nspace_director_name_collision \
-	director_nested \
 	director_overload \
 	director_overload2 \
+	director_pass_by_value \
 	director_primitives \
+	director_property \
 	director_protected \
 	director_protected_overloaded \
 	director_redefined \
+	director_ref \
 	director_smartptr \
 	director_thread \
 	director_unroll \
 	director_using \
+	director_void \
 	director_wombat \
 	disown \
 	dynamic_cast \
@@ -217,6 +219,7 @@ CPP_TEST_CASES += \
 	evil_diamond \
 	evil_diamond_ns \
 	evil_diamond_prop \
+	exception_classname \
 	exception_order \
 	extend \
 	extend_constructor_destructor \
@@ -224,6 +227,7 @@ CPP_TEST_CASES += \
 	extend_placement \
 	extend_special_variables \
 	extend_template \
+	extend_template_method \
 	extend_template_ns \
 	extend_typedef_class \
 	extern_c \
@@ -233,6 +237,7 @@ CPP_TEST_CASES += \
 	features \
 	fragments \
 	friends \
+	friends_template \
 	funcptr_cpp \
 	fvirtual \
 	global_namespace \
@@ -241,8 +246,10 @@ CPP_TEST_CASES += \
 	global_vars \
 	grouping \
 	ignore_parameter \
+	import_fragments \
 	import_nomodule \
 	inherit \
+	inherit_member \
 	inherit_missing \
 	inherit_same_name \
 	inherit_target_language \
@@ -259,9 +266,9 @@ CPP_TEST_CASES += \
 	li_boost_shared_ptr_bits \
 	li_boost_shared_ptr_template \
 	li_boost_shared_ptr_attribute \
-	li_carrays \
-	li_cdata \
-	li_cpointer \
+	li_carrays_cpp \
+	li_cdata_cpp \
+	li_cpointer_cpp \
 	li_std_auto_ptr \
 	li_stdint \
 	li_swigtype_inout \
@@ -272,11 +279,16 @@ CPP_TEST_CASES += \
 	memberin_extend \
 	member_funcptr_galore \
 	member_pointer \
+	member_pointer_const \
 	member_template \
 	minherit \
 	minherit2 \
 	mixed_types \
 	multiple_inheritance \
+	multiple_inheritance_abstract \
+	multiple_inheritance_interfaces \
+	multiple_inheritance_nspace \
+	multiple_inheritance_shared_ptr \
 	name_cxx \
 	name_warnings \
 	namespace_class \
@@ -298,6 +310,7 @@ CPP_TEST_CASES += \
 	nested_class \
 	nested_directors \
 	nested_comment \
+	nested_ignore \
 	nested_scope \
 	nested_template_base \
 	nested_workaround \
@@ -325,6 +338,7 @@ CPP_TEST_CASES += \
 	preproc_constants \
 	primitive_ref \
 	private_assign \
+	proxycode \
 	protected_rename \
 	pure_virtual \
 	redefined \
@@ -336,12 +350,14 @@ CPP_TEST_CASES += \
 	rename2 \
 	rename3 \
 	rename4 \
+	rename_rstrip_encoder \
 	rename_scope \
 	rename_simple \
 	rename_strip_encoder \
 	rename_pcre_encoder \
 	rename_pcre_enum \
 	rename_predicates \
+	rename_wildcard \
 	restrict_cplusplus \
 	return_const_value \
 	return_value_scope \
@@ -352,6 +368,7 @@ CPP_TEST_CASES += \
 	smart_pointer_const2 \
 	smart_pointer_const_overload \
 	smart_pointer_extend \
+	smart_pointer_ignore \
 	smart_pointer_member \
 	smart_pointer_multi \
 	smart_pointer_multi_typedef \
@@ -369,12 +386,15 @@ CPP_TEST_CASES += \
 	smart_pointer_templatevariables \
 	smart_pointer_typedef \
 	special_variables \
+	special_variable_attributes \
 	special_variable_macros \
 	static_array_member \
 	static_const_member \
 	static_const_member_2 \
+	string_constants \
 	struct_initialization_cpp \
 	struct_value \
+	swig_exception \
 	symbol_clash \
 	template_arg_replace \
 	template_arg_scope \
@@ -389,7 +409,10 @@ CPP_TEST_CASES += \
 	template_default \
 	template_default2 \
 	template_default_arg \
+	template_default_arg_overloaded \
+	template_default_arg_overloaded_extend \
 	template_default_arg_virtual_destructor \
+	template_default_cache \
 	template_default_class_parms \
 	template_default_class_parms_typedef \
 	template_default_inherit \
@@ -407,6 +430,7 @@ CPP_TEST_CASES += \
 	template_inherit \
 	template_inherit_abstract \
 	template_int_const \
+	template_keyword_in_type \
 	template_methods \
 	template_namespace_forward_declaration \
 	template_using_directive_and_declaration_forward \
@@ -463,12 +487,13 @@ CPP_TEST_CASES += \
 	typedef_reference \
 	typedef_scope \
 	typedef_sizet \
-	typedef_struct \
+	typedef_struct_cpp \
 	typedef_typedef \
 	typemap_arrays \
 	typemap_array_qualifiers \
 	typemap_delete \
 	typemap_directorout \
+	typemap_documentation \
 	typemap_global_scope \
 	typemap_manyargs \
 	typemap_namespace \
@@ -502,6 +527,7 @@ CPP_TEST_CASES += \
 	valuewrapper_opaque \
 	varargs \
 	varargs_overload \
+	variable_replacement \
 	virtual_destructor \
 	virtual_poly \
 	virtual_vs_nonvirtual_base \
@@ -510,7 +536,7 @@ CPP_TEST_CASES += \
 	wrapmacro
 
 # C++11 test cases.
-CPP11_TEST_CASES = \
+CPP11_TEST_CASES += \
 	cpp11_alignment \
 	cpp11_alternate_function_syntax \
 	cpp11_constexpr \
@@ -518,6 +544,7 @@ CPP11_TEST_CASES = \
 	cpp11_default_delete \
 	cpp11_delegating_constructors \
 	cpp11_director_enums \
+	cpp11_directors \
 	cpp11_explicit_conversion_operators \
 	cpp11_final_override \
 	cpp11_function_objects \
@@ -525,6 +552,7 @@ CPP11_TEST_CASES = \
 	cpp11_initializer_list \
 	cpp11_initializer_list_extend \
 	cpp11_lambda_functions \
+	cpp11_li_std_array \
 	cpp11_noexcept \
 	cpp11_null_pointer_constant \
 	cpp11_raw_string_literals \
@@ -540,13 +568,13 @@ CPP11_TEST_CASES = \
 	cpp11_template_explicit \
 	cpp11_template_typedefs \
 	cpp11_type_traits \
+	cpp11_type_aliasing \
 	cpp11_uniform_initialization \
 	cpp11_unrestricted_unions \
 	cpp11_userdefined_literals \
 
 # Broken C++11 test cases.
 CPP11_TEST_BROKEN = \
-#	cpp11_hash_tables \           # not fully implemented yet
 #	cpp11_variadic_templates \    # Broken for some languages (such as Java)
 #	cpp11_reference_wrapper \     # No typemaps
 
@@ -568,7 +596,7 @@ CPP_STD_TEST_CASES += \
 	li_std_vector \
 	li_std_vector_enum \
 	li_std_vector_member_var\
-	naturalvar \
+	li_std_vector_ptr \
 	smart_pointer_inherit \
 	template_typedef_fnc \
 	template_type_namespace \
@@ -593,7 +621,7 @@ C_TEST_CASES += \
 	char_constant \
 	const_const \
 	constant_expr \
-	empty \
+	empty_c \
 	enums \
 	enum_forward \
 	enum_macro \
@@ -606,7 +634,7 @@ C_TEST_CASES += \
 	inctest \
 	infinity \
 	integers \
-	keyword_rename \
+	keyword_rename_c \
 	lextype \
 	li_carrays \
 	li_cdata \
@@ -621,8 +649,8 @@ C_TEST_CASES += \
 	nested_extend_c \
 	nested_structs \
 	newobject2 \
-	overload_extend \
-	overload_extendc \
+	overload_extend_c \
+	overload_extend2 \
 	preproc \
 	preproc_constants_c \
 	preproc_defined \
@@ -655,6 +683,11 @@ MULTI_CPP_TEST_CASES += \
 wallkw.cpptest: SWIGOPT += -Wallkw
 preproc_include.ctest: SWIGOPT += -includeall
 
+# Allow modules to define temporarily failing tests.
+C_TEST_CASES := $(filter-out $(FAILING_C_TESTS),$(C_TEST_CASES))
+CPP_TEST_CASES := $(filter-out $(FAILING_CPP_TESTS),$(CPP_TEST_CASES))
+MULTI_CPP_TEST_CASES := $(filter-out $(FAILING_MULTI_CPP_TESTS),$(MULTI_CPP_TEST_CASES))
+
 
 NOT_BROKEN_TEST_CASES =	$(CPP_TEST_CASES:=.cpptest) \
 			$(C_TEST_CASES:=.ctest) \
@@ -685,6 +718,7 @@ all: $(NOT_BROKEN_TEST_CASES) $(BROKEN_TEST_CASES)
 broken: $(BROKEN_TEST_CASES)
 
 check: $(NOT_BROKEN_TEST_CASES)
+	@echo $(words $^) $(LANGUAGE) tests passed
 
 check-c: $(C_TEST_CASES:=.ctest)
 
@@ -692,6 +726,13 @@ check-cpp: $(CPP_TEST_CASES:=.cpptest)
 
 check-cpp11: $(CPP11_TEST_CASES:=.cpptest)
 
+check-failing-test = \
+	$(MAKE) -s $1.$2 >/dev/null 2>/dev/null && echo "Failing test $1 passed."
+
+check-failing:
+	+-$(foreach t,$(FAILING_C_TESTS),$(call check-failing-test,$t,ctest);)
+	+-$(foreach t,$(FAILING_CPP_TESTS),$(call check-failing-test,$t,cpptest);)
+	+-$(foreach t,$(FAILING_MULTI_CPP_TESTS),$(call check-failing-test,$t,multicpptest);)
 endif
 
 # partialcheck target runs SWIG only, ie no compilation or running of tests (for a subset of languages)
@@ -699,37 +740,37 @@ partialcheck:
 	$(MAKE) check CC=true CXX=true LDSHARED=true CXXSHARED=true RUNTOOL=true COMPILETOOL=true
 
 swig_and_compile_cpp =  \
-	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR="$(SRCDIR)" CXXSRCS="$(CXXSRCS)" \
-	SWIG_LIB="$(SWIG_LIB)" SWIG="$(SWIG)" \
-	INCLUDES="$(INCLUDES)" SWIGOPT="$(SWIGOPT)" NOLINK=true \
-	TARGET="$(TARGETPREFIX)$*$(TARGETSUFFIX)" INTERFACEDIR="$(INTERFACEDIR)" INTERFACE="$*.i" \
+	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' CXXSRCS='$(CXXSRCS)' \
+	SWIG_LIB_DIR='$(SWIG_LIB_DIR)' SWIGEXE='$(SWIGEXE)' \
+	INCLUDES='$(INCLUDES)' SWIGOPT='$(SWIGOPT)' NOLINK=true \
+	TARGET='$(TARGETPREFIX)$*$(TARGETSUFFIX)' INTERFACEDIR='$(INTERFACEDIR)' INTERFACE='$*.i' \
 	$(LANGUAGE)$(VARIANT)_cpp
 
 swig_and_compile_c =  \
-	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR="$(SRCDIR)" CSRCS="$(CSRCS)" \
-	SWIG_LIB="$(SWIG_LIB)" SWIG="$(SWIG)" \
-	INCLUDES="$(INCLUDES)" SWIGOPT="$(SWIGOPT)" NOLINK=true \
-	TARGET="$(TARGETPREFIX)$*$(TARGETSUFFIX)" INTERFACEDIR="$(INTERFACEDIR)" INTERFACE="$*.i" \
+	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' CSRCS='$(CSRCS)' \
+	SWIG_LIB_DIR='$(SWIG_LIB_DIR)' SWIGEXE='$(SWIGEXE)' \
+	INCLUDES='$(INCLUDES)' SWIGOPT='$(SWIGOPT)' NOLINK=true \
+	TARGET='$(TARGETPREFIX)$*$(TARGETSUFFIX)' INTERFACEDIR='$(INTERFACEDIR)' INTERFACE='$*.i' \
 	$(LANGUAGE)$(VARIANT)
 
 swig_and_compile_multi_cpp = \
 	for f in `cat $(top_srcdir)/$(EXAMPLES)/$(TEST_SUITE)/$*.list` ; do \
-	  $(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR="$(SRCDIR)" CXXSRCS="$(CXXSRCS)" \
-	  SWIG_LIB="$(SWIG_LIB)" SWIG="$(SWIG)" LIBS='$(LIBS)' \
-	  INCLUDES="$(INCLUDES)" SWIGOPT="$(SWIGOPT)" NOLINK=true \
-	  TARGET="$(TARGETPREFIX)$${f}$(TARGETSUFFIX)" INTERFACEDIR="$(INTERFACEDIR)" INTERFACE="$$f.i" \
+	  $(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' CXXSRCS='$(CXXSRCS)' \
+	  SWIG_LIB_DIR='$(SWIG_LIB_DIR)' SWIGEXE='$(SWIGEXE)' \
+	  LIBS='$(LIBS)' INCLUDES='$(INCLUDES)' SWIGOPT='$(SWIGOPT)' NOLINK=true \
+	  TARGET="$(TARGETPREFIX)$${f}$(TARGETSUFFIX)" INTERFACEDIR='$(INTERFACEDIR)' INTERFACE="$$f.i" \
 	  $(LANGUAGE)$(VARIANT)_cpp; \
 	done
 
 swig_and_compile_external =  \
-	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR="$(SRCDIR)" \
-	SWIG_LIB="$(SWIG_LIB)" SWIG="$(SWIG)" \
-	TARGET="$*_wrap_hdr.h" \
-	$(LANGUAGE)$(VARIANT)_externalhdr; \
-	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR="$(SRCDIR)" CXXSRCS="$(CXXSRCS) $*_external.cxx" \
-	SWIG_LIB="$(SWIG_LIB)" SWIG="$(SWIG)" \
-	INCLUDES="$(INCLUDES)" SWIGOPT="$(SWIGOPT)" NOLINK=true \
-	TARGET="$(TARGETPREFIX)$*$(TARGETSUFFIX)" INTERFACEDIR="$(INTERFACEDIR)" INTERFACE="$*.i" \
+	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' \
+	SWIG_LIB_DIR='$(SWIG_LIB_DIR)' SWIGEXE='$(SWIGEXE)' \
+	TARGET='$*_wrap_hdr.h' \
+	$(LANGUAGE)$(VARIANT)_externalhdr && \
+	$(MAKE) -f $(top_builddir)/$(EXAMPLES)/Makefile SRCDIR='$(SRCDIR)' CXXSRCS='$(CXXSRCS) $*_external.cxx' \
+	SWIG_LIB_DIR='$(SWIG_LIB_DIR)' SWIGEXE='$(SWIGEXE)' \
+	INCLUDES='$(INCLUDES)' SWIGOPT='$(SWIGOPT)' NOLINK=true \
+	TARGET='$(TARGETPREFIX)$*$(TARGETSUFFIX)' INTERFACEDIR='$(INTERFACEDIR)' INTERFACE='$*.i' \
 	$(LANGUAGE)$(VARIANT)_cpp
 
 swig_and_compile_runtime = \
@@ -739,7 +780,7 @@ setup = \
 	  echo "$(ACTION)ing $(LANGUAGE) testcase $* (with run test)" ; \
 	else								  \
 	  echo "$(ACTION)ing $(LANGUAGE) testcase $*" ;		  \
-	fi;
+	fi
 
 
 

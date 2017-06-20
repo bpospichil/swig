@@ -8,6 +8,10 @@
 static void Swig_free(void* p) {
   free(p);
 }
+
+static void* Swig_malloc(int c) {
+  return malloc(c);
+}
 %}
 
 %insert(runtime) %{
@@ -58,6 +62,24 @@ typedef ptrdiff_t intgo;
 typedef size_t uintgo;
 %}
 #endif
+#endif
+
+#ifndef SWIGGO_GCCGO
+// Set the host compiler struct attribute that will be
+// used to match gc's struct layout. For example, on 386 Windows,
+// gcc wants to 8-align int64s, but gc does not.
+// Use __gcc_struct__ to work around http://gcc.gnu.org/PR52991 on x86,
+// and https://golang.org/issue/5603.
+// See: https://github.com/golang/go/blob/fcbf04f9b93b4cd8addd05c2ed784118eb50a46c/src/cmd/cgo/out.go#L663
+%insert(runtime) %{
+# if !defined(__clang__) && (defined(__i386__) || defined(__x86_64__))
+#   define SWIGSTRUCTPACKED __attribute__((__packed__, __gcc_struct__))
+# else
+#   define SWIGSTRUCTPACKED __attribute__((__packed__))
+# endif
+%}
+#else
+# define SWIGSTRUCTPACKED
 #endif
 
 %insert(runtime) %{
@@ -113,25 +135,35 @@ static char *_swig_topofstack() {
   }
 }
 
-static void *_swig_goallocate(size_t len) {
-  struct {
-    size_t len;
-    void *ret;
-  } a;
-  a.len = len;
-  crosscall2(_cgo_allocate, &a, (int) sizeof a);
-  return a.ret;
-}
-
 static void _swig_gopanic(const char *p) {
   struct {
     const char *p;
-  } a;
+  } SWIGSTRUCTPACKED a;
   a.p = p;
   crosscall2(_cgo_panic, &a, (int) sizeof a);
 }
 
 %}
+
+#if !SWIGGO_CGO
+
+/* This is here for backward compatibility, but it will not work
+   with Go 1.5 or later.  Do not use it in new code.  */
+%insert(runtime) %{
+
+static void *_swig_goallocate(size_t len) {
+  struct {
+    size_t len;
+    void *ret;
+  } SWIGSTRUCTPACKED a;
+  a.len = len;
+  crosscall2(_cgo_allocate, &a, (int) sizeof a);
+  return a.ret;
+}
+
+%}
+
+#endif
 
 #if !SWIGGO_CGO
 
@@ -244,8 +276,12 @@ void SwigCgocallBackDone() {
 
 #endif
 
+#if !SWIGGO_CGO
+
 %insert(runtime) %{
 
+/* This is here for backward compatibility, but it will not work
+   with Go 1.5 or later.  Do not use it in new code.  */
 static _gostring_ _swig_makegostring(const char *p, size_t l) {
   _gostring_ ret;
   ret.p = (char*)_swig_goallocate(l + 1);
@@ -253,6 +289,12 @@ static _gostring_ _swig_makegostring(const char *p, size_t l) {
   ret.n = l;
   return ret;
 }
+
+%}
+
+#endif
+
+%insert(runtime) %{
 
 #define SWIG_contract_assert(expr, msg) \
   if (!(expr)) { _swig_gopanic(msg); } else
@@ -286,8 +328,6 @@ type _ unsafe.Pointer
 
 %}
 
-#if !SWIGGO_CGO
-
 /* Swig_always_false is used to conditionally assign parameters to
    Swig_escape_val so that the compiler thinks that they escape.  We
    only assign them if Swig_always_false is true, which it never is.
@@ -297,8 +337,6 @@ type _ unsafe.Pointer
 var Swig_escape_always_false bool
 var Swig_escape_val interface{}
 %}
-
-#endif
 
 /* Function pointers are translated by the code in go.cxx into
    _swig_fnptr.  Member pointers are translated to _swig_memberptr.  */

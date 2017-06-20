@@ -12,13 +12,16 @@ def grabpath():
     return funcpath
 def grabstaticpath():
     return staticfuncpath
+def clearstaticpath():
+    global staticfuncpath
+    staticfuncpath = None
 %}
 
-%pythonappend Test::func %{
+%pythonappend Test::funk %{
 funcpath = os.path.dirname(funcpath)
 %}
 
-%pythonprepend Test::func %{
+%pythonprepend Test::funk %{
 global funcpath
 funcpath = mypath
 %}
@@ -43,7 +46,7 @@ import os.path
 class Test {
 public:
   static void static_func() {};
-  void func() {};
+  void funk() {};
 };
 
 #ifdef SWIGPYTHON_BUILTIN

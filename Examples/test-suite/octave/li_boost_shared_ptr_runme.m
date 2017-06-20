@@ -1,3 +1,8 @@
+# do not dump Octave core
+if exist("crash_dumps_octave_core", "builtin")
+  crash_dumps_octave_core(0);
+endif
+
 1;
 li_boost_shared_ptr;
 
@@ -503,7 +508,6 @@ function runtest()
     #KTODO cvar.GlobalPointer = None
 
     # plain reference
-    kglobal;
     k = Klass("global reference");
     cvar.GlobalReference = k;
     verifyCount(1, k)

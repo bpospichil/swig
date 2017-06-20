@@ -58,7 +58,13 @@ INTERFACE  =
 INTERFACEDIR  =
 INTERFACEPATH = $(SRCDIR)$(INTERFACEDIR)$(INTERFACE)
 SWIGOPT    =
-SWIG       = swig
+
+# SWIG_LIB_DIR and SWIGEXE must be explicitly set by Makefiles using this Makefile
+SWIG_LIB_DIR = ./Lib
+SWIGEXE    = swig
+SWIG_LIB_SET = @SWIG_LIB_SET@
+SWIGTOOL   =
+SWIG       = $(SWIG_LIB_SET) $(SWIGTOOL) $(SWIGEXE)
 
 LIBM       = @LIBM@
 LIBC       = @LIBC@
@@ -132,6 +138,13 @@ distclean:
 	rm -f Makefile
 	rm -f d/example.mk
 	rm -f xml/Makefile
+
+##################################################################
+# Very generic invocation of swig
+##################################################################
+
+swiginvoke:
+	$(SWIG) $(SWIGOPT)
 
 ##################################################################
 #####                       Tcl/Tk                          ######
@@ -269,7 +282,7 @@ perl5_static_cpp: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 perl5_run:
-	$(RUNTOOL) $(PERL) $(PERL5_SCRIPT) $(RUNPIPE)
+	$(RUNTOOL) $(PERL) -I. $(PERL5_SCRIPT) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -314,19 +327,22 @@ else
 endif
 PYTHON_SO     = @PYTHON_SO@
 
-# SWIG option for Python
+# SWIG option for Python3
 ifeq (,$(PY3))
-  SWIGPYTHON = $(SWIG) -python
+  SWIGOPTPY3 =
 else
-  SWIGPYTHON = $(SWIG) -python -py3
+  SWIGOPTPY3 = -py3
 endif
+
+PEP8         = @PEP8@
+PEP8_FLAGS   = --ignore=E402,E501,E30,W291,W391
 
 # ----------------------------------------------------------------
 # Build a C dynamically loadable module
 # ----------------------------------------------------------------
 
 python: $(SRCDIR_SRCS)
-	$(SWIGPYTHON) $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
+	$(SWIG) -python $(SWIGOPTPY3) $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
 	$(CC) -c $(CCSHARED) $(CPPFLAGS) $(CFLAGS) $(ISRCS) $(SRCDIR_SRCS) $(INCLUDES) $(PYTHON_INCLUDE)
 	$(LDSHARED) $(CFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(PYTHON_DLNK) $(LIBS) -o $(LIBPREFIX)_$(TARGET)$(PYTHON_SO)
 
@@ -335,7 +351,7 @@ python: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 python_cpp: $(SRCDIR_SRCS)
-	$(SWIGPYTHON) -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
+	$(SWIG) -python $(SWIGOPTPY3) -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	$(CXX) -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(ICXXSRCS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) $(INCLUDES) $(PYTHON_INCLUDE)
 	$(CXXSHARED) $(CXXFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(PYTHON_DLNK) $(LIBS) $(CPP_DLLIBS) -o $(LIBPREFIX)_$(TARGET)$(PYTHON_SO)
 
@@ -351,12 +367,12 @@ TKINTER =
 PYTHON_LIBOPTS = $(PYTHON_LINK) @LIBS@ $(TKINTER) $(SYSLIBS)
 
 python_static: $(SRCDIR_SRCS)
-	$(SWIGPYTHON) -lembed.i $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
+	$(SWIG) -python $(SWIGOPTPY3) -lembed.i $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) @LINKFORSHARED@ $(ISRCS) $(SRCDIR_SRCS) $(INCLUDES) \
 	$(PYTHON_INCLUDE) $(LIBS) -L$(PYTHON_LIB) $(PYTHON_LIBOPTS) -o $(TARGET)
 
 python_static_cpp: $(SRCDIR_SRCS)
-	$(SWIGPYTHON) -c++ -lembed.i $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
+	$(SWIG) -python $(SWIGOPTPY3) -c++ -lembed.i $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(ICXXSRCS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) $(INCLUDES) \
 	$(PYTHON_INCLUDE) $(LIBS)  -L$(PYTHON_LIB) $(PYTHON_LIBOPTS) -o $(TARGET)
 
@@ -373,8 +389,10 @@ endif
 PY2TO3 = 2to3 `2to3 -l | grep -v -E "Available|import$$" | awk '{print "-f "$$0}'`
 
 python_run: $(PYSCRIPT)
-	export PYTHONPATH=".:$$PYTHONPATH"; \
-	$(RUNTOOL) $(PYTHON) $(PYSCRIPT) $(RUNPIPE)
+ifneq (,$(PEP8))
+	$(COMPILETOOL) $(PEP8) $(PEP8_FLAGS) $(PYSCRIPT)
+endif
+	env PYTHONPATH=$$PWD $(RUNTOOL) $(PYTHON) $(PYSCRIPT) $(RUNPIPE)
 
 ifneq (,$(SRCDIR))
 $(RUNME).py: $(SRCDIR)$(RUNME).py
@@ -411,7 +429,7 @@ python_clean:
 ##################################################################
 
 # Make sure these locate your Octave installation
-OCTAVE        = OCTAVE_HISTFILE=/dev/null @OCTAVE@
+OCTAVE        = @OCTAVE@
 OCTAVE_CXX    = $(DEFS) @OCTAVE_CPPFLAGS@ @OCTAVE_CXXFLAGS@
 
 # Extra Octave specific dynamic linking options
@@ -445,7 +463,7 @@ octave_cpp: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 octave_run:
-	$(RUNTOOL) $(OCTAVE) $(OCTAVE_SCRIPT) $(RUNPIPE)
+	OCTAVE_HISTFILE=/dev/null $(RUNTOOL) $(OCTAVE) $(OCTAVE_SCRIPT) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -569,6 +587,7 @@ JAVASO =@JAVASO@
 JAVALDSHARED = @JAVALDSHARED@
 JAVACXXSHARED = @JAVACXXSHARED@
 JAVACFLAGS = @JAVACFLAGS@
+JAVAFLAGS = @JAVAFLAGS@
 JAVA = @JAVA@
 JAVAC = @JAVAC@ -d .
 
@@ -602,7 +621,7 @@ java_compile: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 java_run:
-	env LD_LIBRARY_PATH=$$PWD $(RUNTOOL) $(JAVA) $(RUNME) $(RUNPIPE)
+	env LD_LIBRARY_PATH=$$PWD $(RUNTOOL) $(JAVA) $(JAVAFLAGS) $(RUNME) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -877,13 +896,13 @@ mzscheme_clean:
 #####                          Ocaml                         #####
 ##################################################################
 
-OCC=@OCAMLC@
-OCAMLDLGEN=@OCAMLDLGEN@
-OCAMLFIND=@OCAMLFIND@
-OCAMLMKTOP=@OCAMLMKTOP@ $(SWIGWHERE)
+OCC=$(COMPILETOOL) @OCAMLC@
+OCAMLDLGEN=$(COMPILETOOL) @OCAMLDLGEN@
+OCAMLFIND=$(COMPILETOOL) @OCAMLFIND@
+OCAMLMKTOP=$(COMPILETOOL) @OCAMLMKTOP@ $(SWIGWHERE)
 NOLINK ?= false
 OCAMLPP= -pp "camlp4o ./swigp4.cmo"
-OCAMLP4WHERE=`$(COMPILETOOL) camlp4 -where`
+OCAMLP4WHERE=`$(COMPILETOOL) @CAMLP4@ -where`
 OCAMLCORE=\
 	rm -rf swig.mli swig.ml swigp4.ml && \
 	$(SWIG) -ocaml -co swig.mli 2>/dev/null &&  \
@@ -891,8 +910,7 @@ OCAMLCORE=\
 	$(SWIG) -ocaml -co swigp4.ml 2>/dev/null &&  \
 	$(OCC) -c swig.mli &&  \
 	$(OCC) -c swig.ml &&  \
-	$(OCC) -I $(OCAMLP4WHERE) -pp "camlp4o pa_extend.cmo q_MLast.cmo" \
-		-c swigp4.ml
+	$(OCC) -I $(OCAMLP4WHERE) -pp "camlp4o pa_extend.cmo q_MLast.cmo" -c swigp4.ml
 
 ocaml_static: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
@@ -900,32 +918,20 @@ ocaml_static: $(SRCDIR_SRCS)
 	$(OCC) -g -c -ccopt -g -ccopt "$(INCLUDES)" $(ISRCS) $(SRCDIR_SRCS)
 	$(OCC) -g -c $(INTERFACE:%.i=%.mli)
 	$(OCC) -g -c $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) \
-		swig.cmo \
-		$(INTERFACE:%.i=%.cmo) \
-		$(PROGFILE:%.ml=%.cmo) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)"
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) swig.cmo $(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)"
 
 ocaml_dynamic: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
 	$(SWIG) -ocaml $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
 	$(OCC) -g -c -ccopt -g -ccopt "$(INCLUDES)" $(ISRCS) $(SRCDIR_SRCS)
-	$(CXXSHARED) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(CCSHARED) -o $(INTERFACE:%.i=%@SO@) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) $(LIBS)
-	$(OCAMLDLGEN) $(INTERFACE:%.i=%.ml) $(INTERFACE:%.i=%@SO@) > \
-		$(INTERFACE:%.i=%_dynamic.ml)
+	$(CXXSHARED) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) $(CCSHARED) -o $(INTERFACE:%.i=%@SO@) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) $(LIBS)
+	$(OCAMLDLGEN) $(INTERFACE:%.i=%.ml) $(INTERFACE:%.i=%@SO@) > $(INTERFACE:%.i=%_dynamic.ml)
 	mv $(INTERFACE:%.i=%_dynamic.ml) $(INTERFACE:%.i=%.ml)
 	rm $(INTERFACE:%.i=%.mli)
 	$(OCAMLFIND) $(OCC) -g -c -package dl $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCAMLFIND) \
-		$(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) \
-		swig.cmo \
-		-package dl -linkpkg \
-		$(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo)
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCAMLFIND) $(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) swig.cmo -package dl -linkpkg $(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo)
 
 ocaml_static_toplevel: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
@@ -933,72 +939,41 @@ ocaml_static_toplevel: $(SRCDIR_SRCS)
 	$(OCC) -g -c -ccopt -g -ccopt "$(INCLUDES)" $(ISRCS) $(SRCDIR_SRCS)
 	$(OCC) -g -c $(INTERFACE:%.i=%.mli)
 	$(OCC) -g -c $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCAMLMKTOP) \
-		swig.cmo \
-		-I $(OCAMLP4WHERE) camlp4o.cma swigp4.cmo \
-		-g -ccopt -g -cclib -g -custom -o $(TARGET)_top \
-		$(INTERFACE:%.i=%.cmo) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)"
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCAMLMKTOP) swig.cmo -I $(OCAMLP4WHERE) camlp4o.cma swigp4.cmo -g -ccopt -g -cclib -g -custom -o $(TARGET)_top $(INTERFACE:%.i=%.cmo) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)"
 
 ocaml_static_cpp: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
 	$(SWIG) -ocaml -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	cp $(ICXXSRCS) $(ICXXSRCS:%.cxx=%.c)
-	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" \
-		$(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
+	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" $(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
 	$(OCC) -g -c $(INTERFACE:%.i=%.mli)
 	$(OCC) -g -c $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) \
-		swig.cmo \
-		$(INTERFACE:%.i=%.cmo) \
-		$(PROGFILE:%.ml=%.cmo) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) \
-		-cclib "$(LIBS)" -cc '$(CXX) -Wno-write-strings'
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCC) -g -ccopt -g -cclib -g -custom -o $(TARGET) swig.cmo $(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)" -cc '$(CXX) -Wno-write-strings'
 
 ocaml_static_cpp_toplevel: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
 	$(SWIG) -ocaml -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	cp $(ICXXSRCS) $(ICXXSRCS:%.cxx=%.c)
-	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" \
-		$(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
+	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" $(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
 	$(OCC) -g -c $(INTERFACE:%.i=%.mli)
 	$(OCC) -g -c $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCAMLMKTOP) \
-		swig.cmo \
-		-I $(OCAMLP4WHERE) dynlink.cma camlp4o.cma swigp4.cmo \
-		-g -ccopt -g -cclib -g -custom -o $(TARGET)_top \
-		$(INTERFACE:%.i=%.cmo) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) \
-		-cclib "$(LIBS)" -cc '$(CXX) -Wno-write-strings'
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCAMLMKTOP) swig.cmo -I $(OCAMLP4WHERE) dynlink.cma camlp4o.cma swigp4.cmo -g -ccopt -g -cclib -g -custom -o $(TARGET)_top $(INTERFACE:%.i=%.cmo) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) -cclib "$(LIBS)" -cc '$(CXX) -Wno-write-strings'
 
 ocaml_dynamic_cpp: $(SRCDIR_SRCS)
 	$(OCAMLCORE)
 	$(SWIG) -ocaml -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	cp $(ICXXSRCS) $(ICXXSRCS:%.cxx=%.c)
-	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" \
-		$(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) -ccopt -fPIC
-	$(CXXSHARED) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $(INTERFACE:%.i=%@SO@) \
-		$(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) \
-		$(CPP_DLLIBS) $(LIBS)
-	$(OCAMLDLGEN) $(INTERFACE:%.i=%.ml) $(INTERFACE:%.i=%@SO@) > \
-		$(INTERFACE:%.i=%_dynamic.ml)
+	$(OCC) -cc '$(CXX) -Wno-write-strings' -g -c -ccopt -g -ccopt "-xc++ $(INCLUDES)" $(ICXXSRCS:%.cxx=%.c) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) -ccopt -fPIC
+	$(CXXSHARED) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) -o $(INTERFACE:%.i=%@SO@) $(INTERFACE:%.i=%_wrap.@OBJEXT@) $(OBJS) $(CPP_DLLIBS) $(LIBS)
+	$(OCAMLDLGEN) $(INTERFACE:%.i=%.ml) $(INTERFACE:%.i=%@SO@) > $(INTERFACE:%.i=%_dynamic.ml)
 	mv $(INTERFACE:%.i=%_dynamic.ml) $(INTERFACE:%.i=%.ml)
 	rm $(INTERFACE:%.i=%.mli)
 	$(OCAMLFIND) $(OCC) -g -c -package dl $(INTERFACE:%.i=%.ml)
-	test -z "$(PROGFILE)" || test -f "$(PROGFILE)" && \
-		$(OCC) $(OCAMLPP) -c $(PROGFILE)
-	$(NOLINK) || $(OCAMLFIND) \
-		swig.cmo \
-		$(OCC) -cclib -export-dynamic -g -ccopt -g -cclib -g -custom \
-		-o $(TARGET) \
-		-package dl -linkpkg \
-		$(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo) -cc '$(CXX) -Wno-write-strings'
+	test -z "$(PROGFILE)" || $(OCC) $(OCAMLPP) -c $(PROGFILE)
+	$(NOLINK) || $(OCAMLFIND) swig.cmo $(OCC) -cclib -export-dynamic -g -ccopt -g -cclib -g -custom -o $(TARGET) -package dl -linkpkg $(INTERFACE:%.i=%.cmo) $(PROGFILE:%.ml=%.cmo) -cc '$(CXX) -Wno-write-strings'
 
 # -----------------------------------------------------------------
 # Run ocaml example
@@ -1078,7 +1053,7 @@ ruby_cpp_static: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 ruby_run:
-	$(RUNTOOL) $(RUBY) -I. $(RUBY_SCRIPT) $(RUNPIPE)
+	$(RUNTOOL) $(RUBY) $(RUBYFLAGS) -I. $(RUBY_SCRIPT) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -1097,7 +1072,57 @@ ruby_clean:
 	rm -f *.@OBJEXT@ *$(RUBY_SO)
 
 ##################################################################
-#####                       PHP                             ######
+#####                       PHP5                            ######
+##################################################################
+
+PHP5         = @PHP5@
+PHP5_INCLUDE = @PHP5INC@
+PHP5_SO      = @PHP5_SO@
+PHP5_SCRIPT  = $(SRCDIR)$(RUNME).php
+
+# -------------------------------------------------------------------
+# Build a PHP5 dynamically loadable module (C)
+# -------------------------------------------------------------------
+
+php5: $(SRCDIR_SRCS)
+	$(SWIG) -php5 $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
+	$(CC) -c $(CCSHARED) $(CPPFLAGS) $(CFLAGS) $(SRCDIR_SRCS) $(ISRCS) $(INCLUDES) $(PHP5_INCLUDE)
+	$(LDSHARED) $(CFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(LIBS) -o $(LIBPREFIX)$(TARGET)$(PHP5_SO)
+
+# --------------------------------------------------------------------
+# Build a PHP5 dynamically loadable module (C++)
+# --------------------------------------------------------------------
+
+php5_cpp: $(SRCDIR_SRCS)
+	$(SWIG) -php5 -cppext cxx -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
+	$(CXX) -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) $(ICXXSRCS) $(INCLUDES) $(PHP5_INCLUDE)
+	$(CXXSHARED) $(CXXFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(LIBS) $(CPP_DLLIBS) -o $(LIBPREFIX)$(TARGET)$(PHP5_SO)
+
+# -----------------------------------------------------------------
+# Running a PHP5 example
+# -----------------------------------------------------------------
+
+php5_run:
+	$(RUNTOOL) $(PHP5) -n -q -d extension_dir=. -d safe_mode=Off $(PHP5_SCRIPT) $(RUNPIPE)
+
+# -----------------------------------------------------------------
+# Version display
+# -----------------------------------------------------------------
+
+php5_version:
+	$(PHP5) -v | head -n 1
+
+# -----------------------------------------------------------------
+# Cleaning the PHP5 examples
+# -----------------------------------------------------------------
+
+php5_clean:
+	rm -f *_wrap* *~ .~* example.php php_example.h
+	rm -f core @EXTRA_CLEAN@
+	rm -f *.@OBJEXT@ *$(PHP5_SO)
+
+##################################################################
+#####                       PHP7                            ######
 ##################################################################
 
 PHP         = @PHP@
@@ -1110,7 +1135,7 @@ PHP_SCRIPT  = $(SRCDIR)$(RUNME).php
 # -------------------------------------------------------------------
 
 php: $(SRCDIR_SRCS)
-	$(SWIG) -php $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
+	$(SWIG) -php7 $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
 	$(CC) -c $(CCSHARED) $(CPPFLAGS) $(CFLAGS) $(SRCDIR_SRCS) $(ISRCS) $(INCLUDES) $(PHP_INCLUDE)
 	$(LDSHARED) $(CFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(LIBS) -o $(LIBPREFIX)$(TARGET)$(PHP_SO)
 
@@ -1119,7 +1144,7 @@ php: $(SRCDIR_SRCS)
 # --------------------------------------------------------------------
 
 php_cpp: $(SRCDIR_SRCS)
-	$(SWIG) -php -cppext cxx -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
+	$(SWIG) -php7 -c++ $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	$(CXX) -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) $(ICXXSRCS) $(INCLUDES) $(PHP_INCLUDE)
 	$(CXXSHARED) $(CXXFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(LIBS) $(CPP_DLLIBS) -o $(LIBPREFIX)$(TARGET)$(PHP_SO)
 
@@ -1128,7 +1153,7 @@ php_cpp: $(SRCDIR_SRCS)
 # -----------------------------------------------------------------
 
 php_run:
-	$(RUNTOOL) $(PHP) -n -q -d extension_dir=. -d safe_mode=Off $(PHP_SCRIPT) $(RUNPIPE)
+	$(RUNTOOL) $(PHP) -n -q -d extension_dir=. -d safe_mode=Off -d display_errors=stderr $(PHP_SCRIPT) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -1345,6 +1370,8 @@ CSHARPCOMPILER = @CSHARPCOMPILER@
 CSHARPCILINTERPRETER = @CSHARPCILINTERPRETER@
 CSHARPCILINTERPRETER_FLAGS = @CSHARPCILINTERPRETER_FLAGS@
 CSHARPCFLAGS = @CSHARPCFLAGS@
+CSHARPFLAGS =
+CSHARPOPTIONS =
 CSHARPSO = @CSHARPSO@
 CSHARP_RUNME = $(CSHARPCILINTERPRETER) $(CSHARPCILINTERPRETER_FLAGS) ./$(RUNME).exe
 
@@ -1377,7 +1404,7 @@ SRCDIR_CSHARPSRCS =
 endif
 
 csharp_compile: $(SRCDIR_SRCS)
-	$(COMPILETOOL) $(CSHARPCOMPILER) $(CSHARPFLAGS) $(CSHARPSRCS) $(SRCDIR_CSHARPSRCS)
+	$(COMPILETOOL) $(CSHARPCOMPILER) $(CSHARPFLAGS) $(CSHARPOPTIONS) $(CSHARPSRCS) $(SRCDIR_CSHARPSRCS)
 
 # -----------------------------------------------------------------
 # Run CSharp example
@@ -1439,6 +1466,12 @@ lua_cpp: $(SRCDIR_SRCS) $(GENCXXSRCS)
 	$(SWIG) -c++ -lua $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 	$(CXX) -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(ICXXSRCS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS) $(GENCXXSRCS) $(INCLUDES) $(LUA_INCLUDE)
 	$(CXXSHARED) $(CXXFLAGS) $(LDFLAGS) $(OBJS) $(IOBJS) $(LIBS) $(LUA_LIB) $(CPP_DLLIBS) -o $(LIBPREFIX)$(TARGET)$(LUA_SO)
+
+lua_externalhdr:
+	$(SWIG) -lua -external-runtime $(TARGET)
+
+lua_swig_cpp:
+	$(SWIG) -c++ -lua $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
 
 # -----------------------------------------------------------------
 # Build statically linked Lua interpreter
@@ -1644,7 +1677,8 @@ R = R
 RCXXSRCS = $(INTERFACE:.i=_wrap.cpp) #Need to use _wrap.cpp for R build system as it does not understand _wrap.cxx
 RRSRC = $(INTERFACE:.i=.R)
 R_CFLAGS=-fPIC
-R_SCRIPT=$(RUNME).R
+R_OPT = --slave --quiet --no-save --no-restore
+R_SCRIPT=$(SRCDIR)$(RUNME).R
 
 # need to compile .cxx files outside of R build system to make sure that
 # we get -fPIC
@@ -1659,7 +1693,7 @@ r: $(SRCDIR_SRCS)
 ifneq ($(SRCDIR_SRCS),)
 	$(CC) -g -c $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) $(SRCDIR_SRCS) $(INCLUDES)
 endif
-	+( PKG_CPPFLAGS="$(CPPFLAGS) $(INCLUDES)" $(COMPILETOOL) $(R) CMD SHLIB -o $(LIBPREFIX)$(TARGET)$(SO) $(ISRCS) $(OBJS) > /dev/null )
+	+( PKG_CPPFLAGS="$(CPPFLAGS) $(INCLUDES)" PKG_CFLAGS="$(CFLAGS)" $(COMPILETOOL) $(R) CMD SHLIB -o $(LIBPREFIX)$(TARGET)$(SO) $(ISRCS) $(OBJS) > /dev/null )
 
 # ----------------------------------------------------------------
 # Build a R dynamically loadable module (C++)
@@ -1669,14 +1703,14 @@ r_cpp: $(SRCDIR_CXXSRCS)
 ifneq ($(SRCDIR_CXXSRCS),)
 	$(CXX) -g -c $(CPPFLAGS) $(CXXFLAGS) $(R_CFLAGS) $(SRCDIR_CXXSRCS) $(INCLUDES)
 endif
-	+( PKG_CPPFLAGS="$(CPPFLAGS) $(INCLUDES)" $(COMPILETOOL) $(R) CMD SHLIB -o $(LIBPREFIX)$(TARGET)$(SO) $(RCXXSRCS) $(OBJS) > /dev/null )
+	+( PKG_CPPFLAGS="$(CPPFLAGS) $(INCLUDES)" PKG_CXXFLAGS="$(CXXFLAGS)" $(COMPILETOOL) $(R) CMD SHLIB -o $(LIBPREFIX)$(TARGET)$(SO) $(RCXXSRCS) $(OBJS) > /dev/null )
 
 # -----------------------------------------------------------------
 # Run R example
 # -----------------------------------------------------------------
 
 r_run:
-	$(RUNTOOL) $(R) CMD BATCH $(R_SCRIPT) $(RUNPIPE)
+	$(RUNTOOL) $(R) $(R_OPT) -f $(R_SCRIPT) $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Version display
@@ -1710,7 +1744,7 @@ SCILAB_LIBPREFIX = lib
 
 scilab:
 	$(SWIG) -scilab $(SWIGOPT) -o $(ISRCS) $(INTERFACEPATH)
-	$(CC) -c $(CCSHARED) $(CPPFLAGS) $(CFLAGS) $(SCILAB_INC) $(INCLUDES) $(ISRCS) $(SRCDIR_SRCS) $(SRCDIR_CSRCS)
+	$(CC) -g -c $(CCSHARED) $(CPPFLAGS) $(CFLAGS) $(SCILAB_INC) $(INCLUDES) $(ISRCS) $(SRCDIR_SRCS) $(SRCDIR_CSRCS)
 	$(LDSHARED) $(CFLAGS) $(LDFLAGS) $(IOBJS) $(OBJS) $(LIBS) -o $(SCILAB_LIBPREFIX)$(TARGET)$(SO)
 
 # ----------------------------------------------------------------
@@ -1719,7 +1753,7 @@ scilab:
 
 scilab_cpp:
 	$(SWIG) -c++ -scilab $(SWIGOPT) -o $(ICXXSRCS) $(INTERFACEPATH)
-	$(CXX) -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(SCILAB_INC) $(INCLUDES) $(ICXXSRCS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
+	$(CXX) -g -c $(CCSHARED) $(CPPFLAGS) $(CXXFLAGS) $(SCILAB_INC) $(INCLUDES) $(ICXXSRCS) $(SRCDIR_SRCS) $(SRCDIR_CXXSRCS)
 	$(CXXSHARED) $(CXXFLAGS) $(LDFLAGS) $(IOBJS) $(OBJS) $(LIBS) $(CPP_DLLIBS) -o $(SCILAB_LIBPREFIX)$(TARGET)$(SO)
 
 # -----------------------------------------------------------------
@@ -1727,7 +1761,7 @@ scilab_cpp:
 # -----------------------------------------------------------------
 
 scilab_run:
-	env LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH $(RUNTOOL) $(SCILAB) $(SCILAB_OPT) -f $(SRCDIR)$(RUNME).sci $(RUNPIPE)
+	env LD_LIBRARY_PATH=$$PWD $(RUNTOOL) $(SCILAB) $(SCILAB_OPT) -f $(SRCDIR)$(RUNME).sci $(RUNPIPE)
 
 # -----------------------------------------------------------------
 # Scilab version
@@ -1750,6 +1784,10 @@ scilab_clean:
 #####                        Go                             ######
 ##################################################################
 
+# TODO: The Go make targets need simplifying to use configure time
+# configuration or to use Make's ifeq rather than using lots of
+# runtime shell code. The output will then be a lot less verbose.
+
 GO = @GO@
 GOGCC = @GOGCC@
 GCCGO = @GCCGO@
@@ -1763,12 +1801,12 @@ GCCGOOPT = @GCCGOOPT@
 GOVERSIONOPTION = @GOVERSIONOPTION@
 
 GOSWIGARG = `if $(GOGCC) ; then echo -gccgo; fi`
-GOCOMPILEARG = `if $(GO1) ; then echo tool $(GOC:c=g) ; fi` `if $(GO13) || $(GO15); then echo -pack ; fi`
+GOCOMPILEARG = `if $(GO15); then echo tool compile; elif $(GO1) ; then echo tool $(GOC:c=g) ; fi` `if $(GO13) || $(GO15); then echo -pack ; fi`
 
 GOSRCS = $(INTERFACE:.i=.go)
 GOCSRCS = $(INTERFACE:.i=_gc.c)
 
-GOLD = $(GOC:c=l)
+GOLD = `if $(GO15); then echo link; else echo $(GOC:c=l); fi`
 GOTOOL = `if $(GO1) ; then echo go tool; fi`
 GOPACK = `if $(GO1) ; then echo go tool pack; else echo gopack; fi`
 
@@ -1776,7 +1814,7 @@ GOPACKAGE = $(notdir $(INTERFACE:.i=.a))
 
 GOPATHDIR = gopath/src/$(INTERFACE:.i=)
 
-GOOBJEXT = $(GOC:c=)
+GOOBJEXT = `if $(GO15); then echo o; else echo $(GOC:c=); fi`
 GOGCOBJS = $(GOSRCS:.go=.$(GOOBJEXT))
 GOGCCOBJS = $(GOSRCS:.go=.@OBJEXT@)
 
@@ -1836,7 +1874,7 @@ go: $(SRCDIR_SRCS)
 	cp $(GOSRCS) $(GOPATHDIR)/
 	GOPATH=`pwd`/gopath; \
 	export GOPATH; \
-	CGO_CPPFLAGS="$(CPPFLAGS) $(INCLUDES) -I `pwd`"; \
+	CGO_CPPFLAGS="$(CPPFLAGS) $(INCLUDES) -I `cd $(SRCDIR) && pwd` -I `pwd`"; \
 	export CGO_CPPFLAGS; \
 	CGO_CFLAGS="$(CFLAGS)"; \
 	export CGO_CFLAGS; \
@@ -1852,7 +1890,7 @@ go: $(SRCDIR_SRCS)
 	    $(COMPILETOOL) $(GCCGO) -c -g $(SRCDIR)$(RUNME).go; \
 	    $(COMPILETOOL) $(GCCGO) -o $(RUNME) $(RUNME).@OBJEXT@ $(dir $(INTERFACE))/$(GOPACKAGE); \
 	  elif $(GO12) || $(GO13) || $(GO15); then \
-	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) $(SRCDIR)$(RUNME).go; \
+	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) -o $(RUNME).$(GOOBJEXT) $(SRCDIR)$(RUNME).go; \
 	    $(COMPILETOOL) $(GOTOOL) $(GOLD) -linkmode external -extld "$(CC)" -extldflags "$(CFLAGS) $(LDFLAGS)" -o $(RUNME) $(RUNME).$(GOOBJEXT); \
 	  else \
 	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) $(SRCDIR)$(RUNME).go; \
@@ -1931,7 +1969,7 @@ go_cpp: $(SRCDIR_SRCS)
 	cp $(GOSRCS) $(GOPATHDIR)/
 	GOPATH=`pwd`/gopath; \
 	export GOPATH; \
-	CGO_CPPFLAGS="$(CPPFLAGS) $(INCLUDES) -I `pwd`"; \
+	CGO_CPPFLAGS="$(CPPFLAGS) $(INCLUDES) -I `cd $(SRCDIR) && pwd` -I `pwd`"; \
 	export CGO_CPPFLAGS; \
 	CGO_CFLAGS="$(CFLAGS)"; \
 	export CGO_CFLAGS; \
@@ -1949,7 +1987,7 @@ go_cpp: $(SRCDIR_SRCS)
 	    $(COMPILETOOL) $(GCCGO) -g -c $(SRCDIR)$(RUNME).go; \
 	    $(COMPILETOOL) $(GCCGO) -o $(RUNME) $(RUNME).@OBJEXT@ $(dir $(INTERFACE))/$(GOPACKAGE) -lstdc++; \
 	  elif $(GO12) || $(GO13) || $(GO15); then \
-	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) $(SRCDIR)$(RUNME).go; \
+	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) -o $(RUNME).$(GOOBJEXT) $(SRCDIR)$(RUNME).go; \
 	    $(COMPILETOOL) $(GOTOOL) $(GOLD) -linkmode external -extld "$(CXX)" -extldflags "$(CXXFLAGS) $(LDFLAGS)" -o $(RUNME) $(RUNME).$(GOOBJEXT); \
 	  else \
 	    $(COMPILETOOL) $(GO) $(GOCOMPILEARG) $(SRCDIR)$(RUNME).go; \

@@ -607,6 +607,23 @@ static List *find_args(String *s, int ismacro, String *macro_name) {
 	skip_tochar(s, '\'', str);
 	c = Getc(s);
 	continue;
+      } else if (c == '/') {
+        /* Ensure comments are ignored by eating up the characters */
+        c = Getc(s);
+        if (c == '*') {
+          while ((c = Getc(s)) != EOF) {
+            if (c == '*') {
+              c = Getc(s);
+              if (c == '/' || c == EOF)
+                break;
+            }
+          }
+          c = Getc(s);
+          continue;
+        }
+        /* ensure char is available in the stream as this was not a comment*/
+        Ungetc(c, s);
+        c = '/';
       }
       if ((c == ',') && (level == 0))
 	break;
@@ -1459,7 +1476,7 @@ String *Preprocessor_parse(String *s) {
 	break;
       }
       state = 43;
-      /* no break intended here */
+      /* FALL THRU */
 
     case 43:
       /* Get preprocessor value */
@@ -1771,7 +1788,10 @@ String *Preprocessor_parse(String *s) {
       } else if (Equal(id, "")) {
 	/* Null directive */
       } else {
-	Swig_error(Getfile(s), Getline(id), "Unknown SWIG preprocessor directive: %s (if this is a block of target language code, delimit it with %%{ and %%})\n", id);
+	/* Ignore unknown preprocessor directives which are inside an inactive
+	 * conditional (github issue #394). */
+	if (allow)
+	  Swig_error(Getfile(s), Getline(id), "Unknown SWIG preprocessor directive: %s (if this is a block of target language code, delimit it with %%{ and %%})\n", id);
       }
       for (i = 0; i < cpp_lines; i++)
 	Putc('\n', ns);

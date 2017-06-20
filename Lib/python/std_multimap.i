@@ -26,7 +26,8 @@
 	  return traits_asptr_stdseq<std::multimap<K,T>, std::pair<K, T> >::asptr(items, val);
 	} else {
 	  multimap_type *p;
-	  res = SWIG_ConvertPtr(obj,(void**)&p,swig::type_info<multimap_type>(),0);
+	  swig_type_info *descriptor = swig::type_info<multimap_type>();
+	  res = descriptor ? SWIG_ConvertPtr(obj, (void **)&p, descriptor, 0) : SWIG_ERROR;
 	  if (SWIG_IsOK(res) && val)  *val = p;
 	}
 	return res;
@@ -45,11 +46,10 @@
 	  return SWIG_InternalNewPointerObj(new multimap_type(multimap), desc, SWIG_POINTER_OWN);
 	} else {
 	  size_type size = multimap.size();
-	  int pysize = (size <= (size_type) INT_MAX) ? (int) size : -1;
+	  Py_ssize_t pysize = (size <= (size_type) INT_MAX) ? (Py_ssize_t) size : -1;
 	  if (pysize < 0) {
 	    SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-	    PyErr_SetString(PyExc_OverflowError,
-			    "multimap size not valid in python");
+	    PyErr_SetString(PyExc_OverflowError, "multimap size not valid in python");
 	    SWIG_PYTHON_THREAD_END_BLOCK;
 	    return NULL;
 	  }
@@ -68,7 +68,17 @@
 
 %define %swig_multimap_methods(Type...) 
   %swig_map_common(Type);
+
+#if defined(SWIGPYTHON_BUILTIN)
+  %feature("python:slot", "mp_ass_subscript", functype="objobjargproc") __setitem__;
+#endif
+
   %extend {
+    // This will be called through the mp_ass_subscript slot to delete an entry.
+    void __setitem__(const key_type& key) {
+      self->erase(key);
+    }
+
     void __setitem__(const key_type& key, const mapped_type& x) throw (std::out_of_range) {
       self->insert(Type::value_type(key,x));
     }

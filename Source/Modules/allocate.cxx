@@ -197,15 +197,17 @@ class Allocate:public Dispatcher {
 	      // Found a polymorphic method.
 	      // Mark the polymorphic method, in case the virtual keyword was not used.
 	      Setattr(n, "storage", "virtual");
-
-	      if (both_have_public_access || both_have_protected_access) {
-		if (!is_non_public_base(inclass, b))
-		  Setattr(n, "override", base);	// Note C# definition of override, ie access must be the same
-	      } else if (!both_have_private_access) {
-		// Different access
-		if (this_wrapping_protected_members || base_wrapping_protected_members)
+	      if (!Getattr(b, "feature:interface")) { // interface implementation neither hides nor overrides
+		if (both_have_public_access || both_have_protected_access) {
 		  if (!is_non_public_base(inclass, b))
-		    Setattr(n, "hides", base);	// Note C# definition of hiding, ie hidden if access is different
+		    Setattr(n, "override", base);	// Note C# definition of override, ie access must be the same
+		}
+		else if (!both_have_private_access) {
+		  // Different access
+		  if (this_wrapping_protected_members || base_wrapping_protected_members)
+		    if (!is_non_public_base(inclass, b))
+		      Setattr(n, "hides", base);	// Note C# definition of hiding, ie hidden if access is different
+		}
 	      }
 	      // Try and find the most base's covariant return type
 	      SwigType *most_base_covariant_type = Getattr(base, "covariant");
@@ -729,6 +731,8 @@ Allocate():
       }
     }
 
+    Swig_interface_propagate_methods(n);
+
     /* Only care about default behavior.  Remove temporary values */
     Setattr(n, "allocate:visit", "1");
     Swig_symbol_setscope(symtab);
@@ -941,6 +945,8 @@ Allocate():
 	Setattr(inclass, "allocate:default_destructor", "1");
       } else if (cplus_mode == PROTECTED) {
 	Setattr(inclass, "allocate:default_base_destructor", "1");
+      } else if (cplus_mode == PRIVATE) {
+	Setattr(inclass, "allocate:private_destructor", "1");
       }
     } else {
       Setattr(inclass, "allocate:has_destructor", "1");
